@@ -1,0 +1,27 @@
+{
+  "name": "familycal-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "kill:3000": "node -e \"const {execSync}=require('child_process');try{const out=execSync('netstat -ano -p tcp',{encoding:'utf8'});const pids=[...new Set(out.split(/\\r?\\n/).filter(l=>l.includes(':3000')&&l.includes('LISTENING')).map(l=>l.trim().split(/\\s+/).pop()).filter(Boolean))];if(!pids.length){console.log('Port 3000 is already free');process.exit(0);}for(const pid of pids){try{execSync(`taskkill /F /PID ${pid}`,{stdio:'ignore'});}catch{}}console.log('Freed port 3000 (killed PIDs: '+pids.join(', ')+')');}catch(e){console.log('Port cleanup skipped:',e.message);}\"",
+    "clean:dev": "node -e \"const fs=require('fs');fs.rmSync('.next',{recursive:true,force:true});fs.rmSync('node_modules/.cache',{recursive:true,force:true});console.log('Cleaned .next and node_modules/.cache');\"",
+    "dev:clean": "npm run kill:3000 && npm run clean:dev && next dev -H 0.0.0.0 -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.28",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.28",
+    "typescript": "^5.5.3"
+  }
+}

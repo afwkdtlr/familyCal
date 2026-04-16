@@ -1,0 +1,57 @@
+# =========================
+# Java / Spring Boot backend
+# =========================
+backend/target/
+backend/logs/
+*.log
+
+# Maven / wrapper local runtime cache
+backend/.mvn/apache-maven-*/
+backend/.mvn/*.zip
+backend/.mvn/*.tar.gz
+
+# Eclipse leftovers
+backend/.classpath
+backend/.project
+backend/.settings/
+
+# =========================
+# Next.js / Node frontend
+# =========================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/.npm/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# Environment files
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+
+# =========================
+# IntelliJ / IDE files
+# =========================
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Eclipse workspace metadata
+.metadata/
+
+# =========================
+# OS files
+# =========================
+Thumbs.db
+.DS_Store

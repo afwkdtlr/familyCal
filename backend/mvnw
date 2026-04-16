@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+
+BASE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+MAVEN_VERSION="3.9.9"
+MAVEN_HOME="$BASE_DIR/.mvn/apache-maven-$MAVEN_VERSION"
+MAVEN_BIN="$MAVEN_HOME/bin/mvn"
+MAVEN_TGZ="$BASE_DIR/.mvn/apache-maven-$MAVEN_VERSION-bin.tar.gz"
+MAVEN_URL="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$MAVEN_VERSION/apache-maven-$MAVEN_VERSION-bin.tar.gz"
+
+if [ ! -x "$MAVEN_BIN" ]; then
+  mkdir -p "$BASE_DIR/.mvn"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$MAVEN_URL" -o "$MAVEN_TGZ"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$MAVEN_URL" -O "$MAVEN_TGZ"
+  else
+    echo "curl or wget is required to download Maven."
+    exit 1
+  fi
+  tar -xzf "$MAVEN_TGZ" -C "$BASE_DIR/.mvn"
+fi
+
+if [ -z "$JAVA_HOME" ]; then
+  echo "JAVA_HOME is not set. Please use JDK 17."
+  exit 1
+fi
+
+exec "$MAVEN_BIN" "$@"
