@@ -71,50 +71,56 @@ export function MonthCalendar({ year, monthIndex, events, onPrevMonth, onNextMon
           </button>
         </div>
       </div>
-      <div className="cal-weekdays">
-        {weekdays.map((w) => (
-          <div key={w}>{w}</div>
-        ))}
-      </div>
-      <div className="cal-grid">
-        {cells.map((c, idx) => {
-          const dayEvents = eventsForDay(events, c.y, c.m, c.d);
-          return (
-            <div
-              key={idx}
-              className={`day-cell ${c.inMonth ? "" : "muted"}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelectDay(new Date(c.y, c.m, c.d))}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelectDay(new Date(c.y, c.m, c.d));
-                }
-              }}
-              aria-label={`${c.y}년 ${c.m + 1}월 ${c.d}일 일정 등록`}
-            >
-              <span className="day-num">{c.d}</span>
-              <div className="stack">
-                {dayEvents.slice(0, 3).map((e) => (
-                  <button
-                    key={e.id}
-                    className="event-chip"
-                    type="button"
-                    onClick={(evt) => {
-                      evt.stopPropagation();
-                      onSelectEvent(e);
-                    }}
-                  >
-                    {e.title}
-                  </button>
-                ))}
-                {dayEvents.length > 3 ? <div className="pill">+{dayEvents.length - 3}개</div> : null}
+      <div className="cal-scroll">
+        <div className="cal-weekdays">
+          {weekdays.map((w) => (
+            <div key={w}>{w}</div>
+          ))}
+        </div>
+        <div className="cal-grid">
+          {cells.map((c, idx) => {
+            const dayEvents = eventsForDay(events, c.y, c.m, c.d);
+            return (
+              <div
+                key={idx}
+                className={`day-cell ${c.inMonth ? "" : "muted"}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectDay(new Date(c.y, c.m, c.d))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectDay(new Date(c.y, c.m, c.d));
+                  }
+                }}
+                aria-label={`${c.y}년 ${c.m + 1}월 ${c.d}일 일정 등록`}
+              >
+                <span className="day-num">{c.d}</span>
+                <div className="day-events">
+                  {dayEvents.slice(0, 3).map((e) => (
+                    <button
+                      key={e.id}
+                      className="event-chip"
+                      type="button"
+                      onClick={(evt) => {
+                        evt.stopPropagation();
+                        onSelectEvent(e);
+                      }}
+                    >
+                      {truncateTitle(e.title)}
+                    </button>
+                  ))}
+                  {dayEvents.length > 3 ? <div className="pill">+{dayEvents.length - 3}개</div> : null}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
+}
+
+function truncateTitle(title: string) {
+  return title.length > 6 ? title.slice(0, 6) : title;
 }
