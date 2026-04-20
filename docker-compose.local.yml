@@ -1,0 +1,50 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: familycal-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root1234
+      MYSQL_DATABASE: familycal
+      MYSQL_USER: familycal
+      MYSQL_PASSWORD: 1234
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: familycal-backend
+    environment:
+      SERVER_PORT: 11115
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/familycal?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: familycal
+      SPRING_DATASOURCE_PASSWORD: 1234
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      FAMILYCAL_JWT_SECRET: please-replace-with-a-long-random-secret-at-least-32-characters
+      FAMILYCAL_BOOTSTRAP_ADMIN_USERNAME: admin
+      FAMILYCAL_BOOTSTRAP_ADMIN_PASSWORD: 1234
+    ports:
+      - "11115:11115"
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: familycal-frontend
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:11115
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
