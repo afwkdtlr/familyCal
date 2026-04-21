@@ -5,13 +5,17 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { NewEventDialog } from "@/components/NewEventDialog";
+import { trySilentLogin } from "@/lib/autoLogin";
 import { apiJson } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/storage";
+import { clearAutoLogin, clearToken, getToken } from "@/lib/storage";
 import type { EventResponse, MeResponse } from "@/lib/types";
 
 export default function HomePage() {
   const router = useRouter();
-  const token = useMemo(() => getToken(), []);
+  const [auth, setAuth] = useState<"pending" | "ok">(() => {
+    if (typeof window === "undefined") return "pending";
+    return getToken() ? "ok" : "pending";
+  });
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -45,10 +49,28 @@ export default function HomePage() {
   }, [range.end, range.start]);
 
   useEffect(() => {
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
+    let cancelled = false;
+    (async () => {
+      if (getToken()) {
+        if (!cancelled) setAuth("ok");
+        return;
+      }
+      const ok = await trySilentLogin();
+      if (cancelled) return;
+      if (ok) {
+        setAuth("ok");
+      } else {
+        router.replace("/login");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (auth !== "ok") return;
+    if (!getToken()) return;
     (async () => {
       try {
         const profile = await apiJson<MeResponse>("/api/me");
@@ -57,12 +79,13 @@ export default function HomePage() {
         router.replace("/login");
       }
     })();
-  }, [router, token]);
+  }, [auth, router]);
 
   useEffect(() => {
-    if (!token) return;
+    if (auth !== "ok") return;
+    if (!getToken()) return;
     void load();
-  }, [load, token]);
+  }, [auth, load]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -85,6 +108,7 @@ export default function HomePage() {
   function logout() {
     setMenuOpen(false);
     clearToken();
+    clearAutoLogin();
     router.replace("/login");
   }
 
@@ -134,28 +158,31 @@ export default function HomePage() {
       </header>
 
       <main className="main-area">
-        {loading ? <div className="pill">불러오는 중…</div> : null}
+        {auth === "pending" ? <div className="pill">로그인 확인 중…</div> : null}
+        {auth === "ok" && loading ? <div className="pill">불러오는 중…</div> : null}
         {error ? <div className="error">{error}</div> : null}
 
-        <div style={{ marginTop: 10 }}>
-          <MonthCalendar
-            year={year}
-            monthIndex={monthIndex}
-            events={events}
-            onPrevMonth={() => shiftMonth(-1)}
-            onNextMonth={() => shiftMonth(1)}
-            onToday={() => {
-              const today = new Date();
-              setYear(today.getFullYear());
-              setMonthIndex(today.getMonth());
-            }}
-            onSelectEvent={(e) => setSelected(e)}
-            onSelectDay={(day) => {
-              setNewDay(day);
-              setNewOpen(true);
-            }}
-          />
-        </div>
+        {auth === "ok" ? (
+          <div style={{ marginTop: 10 }}>
+            <MonthCalendar
+              year={year}
+              monthIndex={monthIndex}
+              events={events}
+              onPrevMonth={() => shiftMonth(-1)}
+              onNextMonth={() => shiftMonth(1)}
+              onToday={() => {
+                const today = new Date();
+                setYear(today.getFullYear());
+                setMonthIndex(today.getMonth());
+              }}
+              onSelectEvent={(e) => setSelected(e)}
+              onSelectDay={(day) => {
+                setNewDay(day);
+                setNewOpen(true);
+              }}
+            />
+          </div>
+        ) : null}
       </main>
 
       <NewEventDialog
@@ -187,7 +214,7 @@ export default function HomePage() {
               </button>
             </div>
             <div className="pill" style={{ marginBottom: 10 }}>
-              {new Date(selected.startAt).toLocaleString()} ~ {new Date(selected.endAt).toLocaleString()}
+              {formatDateTimeWithoutSeconds(selected.startAt)} ~ {formatDateTimeWithoutSeconds(selected.endAt)}
             </div>
             <div className="row" style={{ marginBottom: 10 }}>
               <span className="badge">{selected.visibility === "ALL_USERS" ? "가족 전체" : "그룹 한정"}</span>
@@ -208,4 +235,15 @@ function monthRangeIso(year: number, monthIndex: number) {
   const start = new Date(year, monthIndex, 1, 0, 0, 0, 0);
   const end = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
   return { start: start.toISOString(), end: end.toISOString() };
+}
+
+function formatDateTimeWithoutSeconds(iso: string) {
+  return new Date(iso).toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
 }

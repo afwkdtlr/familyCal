@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Backend SpringBoot" type="Application" factoryName="Application">
+  <configuration default="false" name="FamilyCalApplication" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.familycal.FamilyCalApplication" />
     <module name="familyCal" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/backend" />

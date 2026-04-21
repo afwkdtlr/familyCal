@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { trySilentLogin } from "@/lib/autoLogin";
 import { apiJson } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/storage";
+import { clearAutoLogin, clearToken, getToken } from "@/lib/storage";
 import type { GroupResponse, MeResponse, UserRole, UserSummaryResponse } from "@/lib/types";
 
 export default function AdminPage() {
@@ -24,13 +25,34 @@ export default function AdminPage() {
   const [memberGroupId, setMemberGroupId] = useState<string>("");
   const [memberUserId, setMemberUserId] = useState<string>("");
 
-  const token = useMemo(() => getToken(), []);
+  const [auth, setAuth] = useState<"pending" | "ok">(() => {
+    if (typeof window === "undefined") return "pending";
+    return getToken() ? "ok" : "pending";
+  });
 
   useEffect(() => {
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
+    let cancelled = false;
+    (async () => {
+      if (getToken()) {
+        if (!cancelled) setAuth("ok");
+        return;
+      }
+      const ok = await trySilentLogin();
+      if (cancelled) return;
+      if (ok) {
+        setAuth("ok");
+      } else {
+        router.replace("/login");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (auth !== "ok") return;
+    if (!getToken()) return;
     (async () => {
       try {
         const profile = await apiJson<MeResponse>("/api/me");
@@ -49,7 +71,7 @@ export default function AdminPage() {
         setError(e instanceof Error ? e.message : "불러오기 실패");
       }
     })();
-  }, [router, token]);
+  }, [auth, router]);
 
   async function refreshAll() {
     const [u, g] = await Promise.all([
@@ -102,6 +124,7 @@ export default function AdminPage() {
 
   function logout() {
     clearToken();
+    clearAutoLogin();
     router.replace("/login");
   }
 

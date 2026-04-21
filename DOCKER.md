@@ -54,3 +54,22 @@ docker compose -f docker-compose.local.yml logs -f frontend
 - Default admin bootstrap account is controlled by:
   - `FAMILYCAL_BOOTSTRAP_ADMIN_USERNAME`
   - `FAMILYCAL_BOOTSTRAP_ADMIN_PASSWORD`
+
+## 7) Run backend from IDE (recommended)
+
+When running Spring Boot directly from IntelliJ/IDE (not in Docker), use the `local` profile:
+
+- Program argument:
+  - `--spring.profiles.active=local`
+
+This profile (`application-local.yml`) is configured to use:
+
+- DB URL: `jdbc:mysql://localhost:3307/familycal?...`
+- DB user: `familycal`
+- DB password: `1234`
+
+Make sure MySQL container is running first:
+
+```bash
+docker compose -f docker-compose.local.yml up -d mysql
+```
