@@ -287,20 +287,92 @@ textarea {
 }
 
 .cal-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cal-week-pack {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--cal-week-gap, 8px);
+  --cal-week-gap: 8px;
+  --bars-layer-top: 26px;
+}
+
+.cal-week-bars-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--bars-layer-top);
+  z-index: 2;
+  height: var(--bars-stack-h, 0px);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  column-gap: var(--cal-week-gap);
+  row-gap: 3px;
+  align-items: stretch;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.event-bar {
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 3px 6px;
+  border-radius: 8px;
+  background: rgba(196, 92, 106, 0.2);
+  border: 1px solid rgba(196, 92, 106, 0.38);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  pointer-events: auto;
+  margin: 0 2px;
+}
+
+/* Grid items: stretch to track width (fixes 1-column / Sat-only segments). */
+.cal-week-bars-layer .event-bar {
+  justify-self: stretch;
+  align-self: stretch;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+}
+
+.day-inline-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+}
+
+.day-inline-bars .event-bar-single {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.event-bar-muted {
+  opacity: 0.55;
 }
 
 .day-cell {
+  position: relative;
+  z-index: 1;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fff;
   min-height: 102px;
-  padding: 8px;
+  padding: 6px 8px 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .day-cell.muted {
@@ -308,9 +380,27 @@ textarea {
   color: var(--muted);
 }
 
+/* 날짜 숫자 행 — 높이를 멀티데이 오버레이 시작선(--bars-layer-top)과 맞춤 */
+.day-cell-head {
+  flex-shrink: 0;
+  min-height: var(--bars-layer-top);
+  display: flex;
+  align-items: flex-start;
+  padding-top: 2px;
+}
+
 .day-num {
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.2;
+}
+
+/* 멀티데이 막대가 그려지는 줄과 동일 높이 — 하루짜리 막대는 그 아래에서만 시작 */
+.day-bar-spacer {
+  flex-shrink: 0;
+  width: 100%;
+  height: var(--bars-stack-h, 0px);
+  pointer-events: none;
 }
 
 .day-num-btn {
@@ -440,7 +530,23 @@ textarea {
   }
 
   .cal-grid {
-    gap: 3px;
+    gap: 6px;
+  }
+
+  .cal-week-pack {
+    --cal-week-gap: 3px;
+    --bars-layer-top: 22px;
+  }
+
+  .cal-week-bars-layer {
+    row-gap: 2px;
+  }
+
+  .event-bar {
+    font-size: 9px;
+    padding: 2px 3px;
+    min-height: 16px;
+    border-radius: 6px;
   }
 
   .day-cell {

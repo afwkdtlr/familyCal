@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trySilentLogin } from "@/lib/autoLogin";
 import { apiJson } from "@/lib/api";
 import { clearAutoLogin, clearToken, getToken } from "@/lib/storage";
@@ -10,6 +10,8 @@ import type { GroupResponse, MeResponse, UserRole, UserSummaryResponse } from "@
 
 export default function AdminPage() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [me, setMe] = useState<MeResponse | null>(null);
   const [users, setUsers] = useState<UserSummaryResponse[]>([]);
   const [groups, setGroups] = useState<GroupResponse[]>([]);
@@ -25,53 +27,43 @@ export default function AdminPage() {
   const [memberGroupId, setMemberGroupId] = useState<string>("");
   const [memberUserId, setMemberUserId] = useState<string>("");
 
-  const [auth, setAuth] = useState<"pending" | "ok">(() => {
-    if (typeof window === "undefined") return "pending";
-    return getToken() ? "ok" : "pending";
-  });
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (getToken()) {
-        if (!cancelled) setAuth("ok");
-        return;
-      }
-      const ok = await trySilentLogin();
-      if (cancelled) return;
-      if (ok) {
-        setAuth("ok");
-      } else {
-        router.replace("/login");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  useEffect(() => {
-    if (auth !== "ok") return;
-    if (!getToken()) return;
-    (async () => {
       try {
+        if (!getToken()) {
+          const ok = await trySilentLogin();
+          if (cancelled) return;
+          if (!ok) {
+            routerRef.current.replace("/login");
+            return;
+          }
+        }
         const profile = await apiJson<MeResponse>("/api/me");
+        if (cancelled) return;
         setMe(profile);
         if (profile.role !== "ADMIN") {
-          router.replace("/");
+          routerRef.current.replace("/");
           return;
         }
         const [u, g] = await Promise.all([
           apiJson<UserSummaryResponse[]>("/api/admin/users"),
           apiJson<GroupResponse[]>("/api/admin/groups")
         ]);
+        if (cancelled) return;
         setUsers(u);
         setGroups(g);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "불러오기 실패");
+      } catch {
+        if (cancelled) return;
+        clearToken();
+        clearAutoLogin();
+        routerRef.current.replace("/login");
       }
     })();
-  }, [auth, router]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function refreshAll() {
     const [u, g] = await Promise.all([
@@ -125,7 +117,7 @@ export default function AdminPage() {
   function logout() {
     clearToken();
     clearAutoLogin();
-    router.replace("/login");
+    routerRef.current.replace("/login");
   }
 
   return (

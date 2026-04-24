@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trySilentLogin } from "@/lib/autoLogin";
 import { apiJson } from "@/lib/api";
-import type { LoginResponse } from "@/lib/types";
+import type { LoginResponse, MeResponse } from "@/lib/types";
 import {
   clearAutoLogin,
   clearSavedLogin,
+  clearToken,
   getAutoLogin,
   getSavedLogin,
   getToken,
@@ -18,6 +19,8 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberLogin, setRememberLogin] = useState(false);
@@ -26,36 +29,43 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (getToken()) {
-      router.replace("/");
-      return;
-    }
-
-    const saved = getSavedLogin();
-    const auto = getAutoLogin();
-
-    if (saved) {
-      setUsername(saved.username);
-      setPassword(saved.password);
-      setRememberLogin(true);
-    }
-    if (auto) {
-      setAutoLoginState(true);
-    }
-
-    if (!auto || !saved) {
-      return;
-    }
-
     let cancelled = false;
+
     (async () => {
+      if (getToken()) {
+        try {
+          await apiJson<MeResponse>("/api/me");
+          if (!cancelled) routerRef.current.replace("/");
+          return;
+        } catch {
+          clearToken();
+          clearAutoLogin();
+        }
+      }
+
+      const saved = getSavedLogin();
+      const auto = getAutoLogin();
+
+      if (saved) {
+        setUsername(saved.username);
+        setPassword(saved.password);
+        setRememberLogin(true);
+      }
+      if (auto) {
+        setAutoLoginState(true);
+      }
+
+      if (!auto || !saved) {
+        return;
+      }
+
       setLoading(true);
       setError(null);
       const ok = await trySilentLogin();
       if (cancelled) return;
       if (ok) {
         setLoading(false);
-        router.replace("/");
+        routerRef.current.replace("/");
         return;
       }
       setError("자동 로그인에 실패했습니다. 아이디와 비밀번호를 확인한 뒤 다시 로그인해 주세요.");
@@ -65,7 +75,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,7 +99,7 @@ export default function LoginPage() {
         clearAutoLogin();
       }
       setToken(res.token);
-      router.replace("/");
+      routerRef.current.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인 실패");
     } finally {

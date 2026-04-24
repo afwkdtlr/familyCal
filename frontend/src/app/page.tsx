@@ -6,16 +6,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { NewEventDialog } from "@/components/NewEventDialog";
 import { trySilentLogin } from "@/lib/autoLogin";
-import { apiJson } from "@/lib/api";
+import { ApiError, apiJson } from "@/lib/api";
 import { clearAutoLogin, clearToken, getToken } from "@/lib/storage";
 import type { EventResponse, MeResponse } from "@/lib/types";
 
 export default function HomePage() {
   const router = useRouter();
-  const [auth, setAuth] = useState<"pending" | "ok">(() => {
-    if (typeof window === "undefined") return "pending";
-    return getToken() ? "ok" : "pending";
-  });
+  const routerRef = useRef(router);
+  routerRef.current = router;
+  /** Always start pending; validate JWT with /api/me before ok (avoids login↔home redirect loop on stale token). */
+  const [auth, setAuth] = useState<"pending" | "ok">("pending");
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -42,6 +42,12 @@ export default function HomePage() {
       const data = await apiJson<EventResponse[]>(`/api/events?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}`);
       setEvents(data);
     } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        clearAutoLogin();
+        setAuth("pending");
+        routerRef.current.replace("/login");
+        return;
+      }
       setError(e instanceof Error ? e.message : "일정을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
@@ -51,35 +57,30 @@ export default function HomePage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (getToken()) {
-        if (!cancelled) setAuth("ok");
-        return;
-      }
-      const ok = await trySilentLogin();
-      if (cancelled) return;
-      if (ok) {
+      try {
+        if (!getToken()) {
+          const ok = await trySilentLogin();
+          if (cancelled) return;
+          if (!ok) {
+            routerRef.current.replace("/login");
+            return;
+          }
+        }
+        const profile = await apiJson<MeResponse>("/api/me");
+        if (cancelled) return;
+        setMe(profile);
         setAuth("ok");
-      } else {
-        router.replace("/login");
+      } catch {
+        if (cancelled) return;
+        clearToken();
+        clearAutoLogin();
+        routerRef.current.replace("/login");
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [router]);
-
-  useEffect(() => {
-    if (auth !== "ok") return;
-    if (!getToken()) return;
-    (async () => {
-      try {
-        const profile = await apiJson<MeResponse>("/api/me");
-        setMe(profile);
-      } catch {
-        router.replace("/login");
-      }
-    })();
-  }, [auth, router]);
+  }, []);
 
   useEffect(() => {
     if (auth !== "ok") return;
@@ -109,7 +110,7 @@ export default function HomePage() {
     setMenuOpen(false);
     clearToken();
     clearAutoLogin();
-    router.replace("/login");
+    routerRef.current.replace("/login");
   }
 
   return (

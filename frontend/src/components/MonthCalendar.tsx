@@ -13,13 +13,74 @@ type Props = {
   onSelectDay: (day: Date) => void;
 };
 
-function sameLocalDay(iso: string, y: number, m: number, d: number) {
-  const dt = new Date(iso);
-  return dt.getFullYear() === y && dt.getMonth() === m && dt.getDate() === d;
+/** Calendar day [y,m,d] overlaps event interval in local time. */
+function eventOverlapsLocalDay(isoStart: string, isoEnd: string, y: number, m: number, d: number) {
+  const dayStart = new Date(y, m, d, 0, 0, 0, 0).getTime();
+  const dayEnd = new Date(y, m, d, 23, 59, 59, 999).getTime();
+  const s = new Date(isoStart).getTime();
+  const e = new Date(isoEnd).getTime();
+  return s <= dayEnd && e >= dayStart;
 }
 
-function eventsForDay(events: EventResponse[], y: number, m: number, d: number) {
-  return events.filter((e) => sameLocalDay(e.startAt, y, m, d));
+/** More than one local calendar day (e.g. 23rd 09:00 → 25th 10:00). */
+function spansMultipleLocalDays(e: EventResponse) {
+  const s = new Date(e.startAt);
+  const t = new Date(e.endAt);
+  return s.getFullYear() !== t.getFullYear() || s.getMonth() !== t.getMonth() || s.getDate() !== t.getDate();
+}
+
+/** Single-day chips only; multi-day events use the in-cell spanning bar overlay. */
+function singleDayEventsForCell(events: EventResponse[], y: number, m: number, d: number) {
+  return events.filter((e) => eventOverlapsLocalDay(e.startAt, e.endAt, y, m, d) && !spansMultipleLocalDays(e));
+}
+
+type WeekCell = { y: number; m: number; d: number; inMonth: boolean };
+
+type WeekSegment = {
+  event: EventResponse;
+  startCol: number;
+  endCol: number;
+  lane: number;
+};
+
+function weekSegmentForEvent(e: EventResponse, week: WeekCell[]): WeekSegment | null {
+  let startCol = -1;
+  let endCol = -1;
+  for (let col = 0; col < 7; col++) {
+    const c = week[col];
+    if (eventOverlapsLocalDay(e.startAt, e.endAt, c.y, c.m, c.d)) {
+      if (startCol === -1) startCol = col;
+      endCol = col;
+    }
+  }
+  if (startCol === -1) return null;
+  return { event: e, startCol, endCol, lane: 0 };
+}
+
+function assignLanes(segments: Omit<WeekSegment, "lane">[]): WeekSegment[] {
+  const sorted = [...segments].sort((a, b) => a.startCol - b.startCol || a.endCol - b.endCol);
+  const laneRightExclusive: number[] = [];
+  return sorted.map((seg) => {
+    let lane = 0;
+    while (lane < laneRightExclusive.length && seg.startCol < laneRightExclusive[lane]) {
+      lane++;
+    }
+    const rightEx = seg.endCol + 1;
+    if (lane === laneRightExclusive.length) laneRightExclusive.push(rightEx);
+    else laneRightExclusive[lane] = Math.max(laneRightExclusive[lane], rightEx);
+    return { ...seg, lane };
+  });
+}
+
+function multiDaySegmentsForWeek(events: EventResponse[], week: WeekCell[]): WeekSegment[] {
+  const raw: Omit<WeekSegment, "lane">[] = [];
+  for (const e of events) {
+    if (!spansMultipleLocalDays(e)) continue;
+    const seg = weekSegmentForEvent(e, week);
+    if (seg) raw.push({ event: seg.event, startCol: seg.startCol, endCol: seg.endCol });
+  }
+  if (raw.length === 0) return [];
+  return assignLanes(raw);
 }
 
 function buildCells(year: number, monthIndex: number) {
@@ -50,10 +111,19 @@ function buildCells(year: number, monthIndex: number) {
   return cells;
 }
 
+function chunkWeeks(cells: WeekCell[]): WeekCell[][] {
+  const weeks: WeekCell[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7));
+  }
+  return weeks;
+}
+
 export function MonthCalendar({ year, monthIndex, events, onPrevMonth, onNextMonth, onToday, onSelectEvent, onSelectDay }: Props) {
   const title = `${year}년 ${monthIndex + 1}월`;
   const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
   const cells = buildCells(year, monthIndex);
+  const weeks = chunkWeeks(cells);
 
   return (
     <div className="card">
@@ -78,40 +148,83 @@ export function MonthCalendar({ year, monthIndex, events, onPrevMonth, onNextMon
           ))}
         </div>
         <div className="cal-grid">
-          {cells.map((c, idx) => {
-            const dayEvents = eventsForDay(events, c.y, c.m, c.d);
+          {weeks.map((week, wIdx) => {
+            const segments = multiDaySegmentsForWeek(events, week);
+            const laneCount = segments.length === 0 ? 0 : Math.max(...segments.map((s) => s.lane)) + 1;
+            const barsStackPx =
+              laneCount === 0 ? 0 : laneCount * 23 + Math.max(0, laneCount - 1) * 3;
+            const packStyle = {
+              "--week-lanes": laneCount,
+              "--bars-stack-h": `${barsStackPx}px`
+            } as React.CSSProperties;
+
             return (
-              <div
-                key={idx}
-                className={`day-cell ${c.inMonth ? "" : "muted"}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => onSelectDay(new Date(c.y, c.m, c.d))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onSelectDay(new Date(c.y, c.m, c.d));
-                  }
-                }}
-                aria-label={`${c.y}년 ${c.m + 1}월 ${c.d}일 일정 등록`}
-              >
-                <span className="day-num">{c.d}</span>
-                <div className="day-events">
-                  {dayEvents.slice(0, 3).map((e) => (
-                    <button
-                      key={e.id}
-                      className="event-chip"
-                      type="button"
-                      onClick={(evt) => {
-                        evt.stopPropagation();
-                        onSelectEvent(e);
+              <div key={wIdx} className="cal-week-pack" style={packStyle}>
+                {laneCount > 0 ? (
+                  <div
+                    className="cal-week-bars-layer"
+                    style={{ gridTemplateRows: `repeat(${laneCount}, minmax(20px, auto))` }}
+                  >
+                    {segments.map((seg) => {
+                      const gridColumn = `${seg.startCol + 1} / ${seg.endCol + 2}`;
+                      const anyInMonth = week.slice(seg.startCol, seg.endCol + 1).some((c) => c.inMonth);
+                      return (
+                        <button
+                          key={`${seg.event.id}-${wIdx}-${seg.startCol}-${seg.lane}`}
+                          type="button"
+                          className={`event-bar ${!anyInMonth ? "event-bar-muted" : ""}`}
+                          style={{ gridColumn, gridRow: seg.lane + 1 }}
+                          onClick={(evt) => {
+                            evt.stopPropagation();
+                            onSelectEvent(seg.event);
+                          }}
+                        >
+                          {truncateBarTitle(seg.event.title, seg.endCol - seg.startCol + 1)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+                {week.map((c, idx) => {
+                  const dayEvents = singleDayEventsForCell(events, c.y, c.m, c.d);
+                  return (
+                    <div
+                      key={`${wIdx}-${idx}`}
+                      className={`day-cell ${c.inMonth ? "" : "muted"}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onSelectDay(new Date(c.y, c.m, c.d))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelectDay(new Date(c.y, c.m, c.d));
+                        }
                       }}
+                      aria-label={`${c.y}년 ${c.m + 1}월 ${c.d}일 일정 등록`}
                     >
-                      {truncateTitle(e.title)}
-                    </button>
-                  ))}
-                  {dayEvents.length > 3 ? <div className="pill">+{dayEvents.length - 3}개</div> : null}
-                </div>
+                      <div className="day-cell-head">
+                        <span className="day-num">{c.d}</span>
+                      </div>
+                      <div className="day-bar-spacer" aria-hidden />
+                      <div className="day-inline-bars">
+                        {dayEvents.slice(0, 3).map((e) => (
+                          <button
+                            key={e.id}
+                            type="button"
+                            className="event-bar event-bar-single"
+                            onClick={(evt) => {
+                              evt.stopPropagation();
+                              onSelectEvent(e);
+                            }}
+                          >
+                            {truncateBarTitle(e.title, 1)}
+                          </button>
+                        ))}
+                        {dayEvents.length > 3 ? <div className="pill">+{dayEvents.length - 3}개</div> : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -121,6 +234,7 @@ export function MonthCalendar({ year, monthIndex, events, onPrevMonth, onNextMon
   );
 }
 
-function truncateTitle(title: string) {
-  return title.length > 6 ? title.slice(0, 6) : title;
+function truncateBarTitle(title: string, spanCols: number) {
+  const budget = Math.max(spanCols <= 1 ? 16 : 8, spanCols * 6);
+  return title.length > budget ? title.slice(0, budget - 1) + "…" : title;
 }
