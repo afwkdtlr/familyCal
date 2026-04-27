@@ -9,6 +9,7 @@ public class EventResponse {
     private Long id;
     private String title;
     private String description;
+    private String colorHex;
     private Instant startAt;
     private Instant endAt;
     private EventVisibility visibility;
@@ -23,6 +24,7 @@ public class EventResponse {
             Long id,
             String title,
             String description,
+            String colorHex,
             Instant startAt,
             Instant endAt,
             EventVisibility visibility,
@@ -33,6 +35,7 @@ public class EventResponse {
         this.id = id;
         this.title = title;
         this.description = description;
+        this.colorHex = colorHex;
         this.startAt = startAt;
         this.endAt = endAt;
         this.visibility = visibility;
@@ -63,6 +66,14 @@ public class EventResponse {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getColorHex() {
+        return colorHex;
+    }
+
+    public void setColorHex(String colorHex) {
+        this.colorHex = colorHex;
     }
 
     public Instant getStartAt() {

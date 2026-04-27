@@ -3,6 +3,7 @@ package com.familycal.web.dto;
 import com.familycal.domain.EventVisibility;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 import java.time.Instant;
 
@@ -12,6 +13,9 @@ public class CreateEventRequest {
     private String title;
 
     private String description;
+
+    @Pattern(regexp = "^#[0-9A-Fa-f]{6}$", message = "colorHex must be a hex color like #AABBCC")
+    private String colorHex;
 
     @NotNull
     private Instant startAt;
@@ -38,6 +42,14 @@ public class CreateEventRequest {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getColorHex() {
+        return colorHex;
+    }
+
+    public void setColorHex(String colorHex) {
+        this.colorHex = colorHex;
     }
 
     public Instant getStartAt() {

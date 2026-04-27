@@ -35,6 +35,7 @@ export type EventResponse = {
   id: number;
   title: string;
   description: string | null;
+  colorHex: string | null;
   startAt: string;
   endAt: string;
   visibility: EventVisibility;

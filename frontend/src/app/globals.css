@@ -311,17 +311,17 @@ textarea {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   column-gap: var(--cal-week-gap);
-  row-gap: 3px;
+  row-gap: 2px;
   align-items: stretch;
   box-sizing: border-box;
   pointer-events: none;
 }
 
 .event-bar {
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.2;
-  padding: 3px 6px;
-  border-radius: 8px;
+  padding: 1px 4px;
+  border-radius: 6px;
   background: rgba(196, 92, 106, 0.2);
   border: 1px solid rgba(196, 92, 106, 0.38);
   cursor: pointer;
@@ -329,12 +329,19 @@ textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-height: 20px;
+  min-height: 16px;
   display: flex;
   align-items: center;
   box-sizing: border-box;
   pointer-events: auto;
-  margin: 0 2px;
+  margin: 0 1px;
+}
+
+.event-bar-holiday {
+  background: #eaf8fb;
+  border-color: #bfe7ef;
+  color: #49a8c4;
+  font-weight: 600;
 }
 
 /* Grid items: stretch to track width (fixes 1-column / Sat-only segments). */
@@ -351,6 +358,28 @@ textarea {
   flex-direction: column;
   gap: 3px;
   width: 100%;
+}
+
+.day-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 16px;
+  margin-top: 6px;
+}
+
+.day-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.day-hidden-count {
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--muted);
 }
 
 .day-inline-bars .event-bar-single {
@@ -380,6 +409,11 @@ textarea {
   color: var(--muted);
 }
 
+.day-cell.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(196, 92, 106, 0.35);
+}
+
 /* 날짜 숫자 행 — 높이를 멀티데이 오버레이 시작선(--bars-layer-top)과 맞춤 */
 .day-cell-head {
   flex-shrink: 0;
@@ -393,6 +427,10 @@ textarea {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
+}
+
+.holiday-red {
+  color: #e03131;
 }
 
 /* 멀티데이 막대가 그려지는 줄과 동일 높이 — 하루짜리 막대는 그 아래에서만 시작 */
@@ -484,6 +522,129 @@ textarea {
   width: min(420px, 100%);
 }
 
+.color-palette {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.color-swatch {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+.color-swatch.active {
+  border-color: #111827;
+  box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.15);
+}
+
+.day-panel {
+  margin-top: 12px;
+  transition: transform 180ms ease;
+}
+
+.day-panel.dragging {
+  transition: none;
+}
+
+.day-panel-drag-zone {
+  display: grid;
+  place-items: center;
+  padding: 2px 0 8px;
+  margin-top: -4px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.day-panel-drag-zone:active {
+  cursor: grabbing;
+}
+
+.day-panel-drag-handle {
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background: #d1d5db;
+}
+
+.day-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.day-event-item {
+  display: grid;
+  grid-template-columns: 4px 1fr;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.day-event-item.active {
+  border-color: var(--accent);
+  background: rgba(196, 92, 106, 0.08);
+}
+
+.day-event-color-bar {
+  width: 4px;
+  border-radius: 999px;
+  min-height: 44px;
+}
+
+.day-event-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.day-event-detail {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.fab-add {
+  position: fixed;
+  right: 18px;
+  bottom: 22px;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 0;
+  font-size: 32px;
+  line-height: 1;
+  color: #fff;
+  background: #111827;
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.35);
+  cursor: pointer;
+  z-index: 70;
+}
+
+.layout-shell.split-open .day-cell {
+  min-height: 64px;
+}
+
+.layout-shell.split-open .day-inline-bars,
+.layout-shell.split-open .cal-week-bars-layer {
+  display: none;
+}
+
+.layout-shell.split-open .day-bar-spacer {
+  height: 0;
+}
+
 @media (max-width: 760px) {
   .top-bar {
     width: 100%;
@@ -544,9 +705,9 @@ textarea {
 
   .event-bar {
     font-size: 9px;
-    padding: 2px 3px;
-    min-height: 16px;
-    border-radius: 6px;
+    padding: 1px 2px;
+    min-height: 15px;
+    border-radius: 5px;
   }
 
   .day-cell {
@@ -567,6 +728,29 @@ textarea {
   .event-chip {
     font-size: 9px;
     padding: 2px 3px;
+  }
+
+  .day-panel-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fab-add {
+    right: 14px;
+    bottom: 16px;
+    width: 52px;
+    height: 52px;
+    font-size: 30px;
+  }
+
+  .color-palette {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .color-swatch {
+    width: 28px;
+    height: 28px;
   }
 }
 

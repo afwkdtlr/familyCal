@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { apiJson } from "@/lib/api";
 import type { EventResponse, EventVisibility, GroupResponse } from "@/lib/types";
 
+const EVENT_COLORS = ["#FF6B6B", "#FF8E72", "#FFA94D", "#FFD43B", "#69DB7C", "#38D9A9", "#4DABF7", "#748FFC", "#B197FC", "#F783AC"] as const;
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -17,6 +19,7 @@ export function NewEventDialog({ open, onClose, onCreated, defaultDay }: Props) 
   const [visibility, setVisibility] = useState<EventVisibility>("ALL_USERS");
   const [targetGroupId, setTargetGroupId] = useState<string>("");
   const [groups, setGroups] = useState<GroupResponse[]>([]);
+  const [colorHex, setColorHex] = useState<string>(EVENT_COLORS[0]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -45,6 +48,7 @@ export function NewEventDialog({ open, onClose, onCreated, defaultDay }: Props) 
       const payload = {
         title,
         description: description || null,
+        colorHex,
         startAt: new Date(startLocal).toISOString(),
         endAt: new Date(endLocal).toISOString(),
         visibility,
@@ -58,6 +62,7 @@ export function NewEventDialog({ open, onClose, onCreated, defaultDay }: Props) 
       onClose();
       setTitle("");
       setDescription("");
+      setColorHex(EVENT_COLORS[0]);
       setVisibility("ALL_USERS");
       setTargetGroupId("");
     } catch (e) {
@@ -96,6 +101,21 @@ export function NewEventDialog({ open, onClose, onCreated, defaultDay }: Props) 
         <div className="field">
           <div className="label">설명</div>
           <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+        <div className="field">
+          <div className="label">색상</div>
+          <div className="color-palette">
+            {EVENT_COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`color-swatch ${colorHex === color ? "active" : ""}`}
+                style={{ backgroundColor: color }}
+                aria-label={`색상 ${color}`}
+                onClick={() => setColorHex(color)}
+              />
+            ))}
+          </div>
         </div>
         <div className="field">
           <div className="label">시작</div>

@@ -30,7 +30,13 @@ export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuWrapRef = useRef<HTMLDivElement | null>(null);
 
-  const [selected, setSelected] = useState<EventResponse | null>(null);
+  const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [sheetDragY, setSheetDragY] = useState(0);
+  const [sheetDragging, setSheetDragging] = useState(false);
+  const dragStartYRef = useRef<number | null>(null);
+  const [holidays, setHolidays] = useState<Record<string, string>>({});
 
   const range = useMemo(() => monthRangeIso(year, monthIndex), [year, monthIndex]);
 
@@ -89,6 +95,33 @@ export default function HomePage() {
   }, [auth, load]);
 
   useEffect(() => {
+    const yearsToLoad = [year - 1, year, year + 1];
+    let cancelled = false;
+    (async () => {
+      const entries: Array<[string, string]> = [];
+      for (const y of yearsToLoad) {
+        try {
+          const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/KR`);
+          if (!res.ok) continue;
+          const list = (await res.json()) as Array<{ date: string; localName: string; name: string }>;
+          for (const h of list) {
+            const dt = new Date(h.date);
+            if (Number.isNaN(dt.getTime())) continue;
+            entries.push([`${dt.getFullYear()}-${dt.getMonth() + 1}-${dt.getDate()}`, h.localName || h.name]);
+          }
+        } catch {
+          // Ignore network failures; calendar still works without holiday labels.
+        }
+      }
+      if (cancelled) return;
+      setHolidays(Object.fromEntries(entries));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [year]);
+
+  useEffect(() => {
     if (!menuOpen) return;
     function onOutsideClick(e: MouseEvent) {
       if (!menuWrapRef.current) return;
@@ -113,8 +146,63 @@ export default function HomePage() {
     routerRef.current.replace("/login");
   }
 
+  useEffect(() => {
+    if (!sheetDragging) return;
+    function onPointerMove(e: PointerEvent) {
+      if (dragStartYRef.current == null) return;
+      const delta = e.clientY - dragStartYRef.current;
+      setSheetDragY(Math.max(0, delta));
+    }
+    function onPointerUp() {
+      if (sheetDragY > 100) {
+        setSplitOpen(false);
+      }
+      setSheetDragging(false);
+      dragStartYRef.current = null;
+      setSheetDragY(0);
+    }
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [sheetDragging, sheetDragY]);
+
+  const selectedDayKey = `${selectedDay.getFullYear()}-${selectedDay.getMonth() + 1}-${selectedDay.getDate()}`;
+  const holidayEvents = useMemo<EventResponse[]>(() => {
+    return Object.entries(holidays).flatMap(([dayKey, holidayName]) => {
+      const [y, m, d] = dayKey.split("-").map(Number);
+      if (!y || !m || !d) return [];
+      const start = new Date(y, m - 1, d, 0, 0, 0, 0);
+      const end = new Date(y, m - 1, d, 23, 59, 59, 999);
+      return [
+        {
+          id: -(y * 10000 + m * 100 + d),
+          title: holidayName,
+          description: "공휴일",
+          colorHex: "#79C6DD",
+          startAt: start.toISOString(),
+          endAt: end.toISOString(),
+          visibility: "ALL_USERS",
+          targetGroupId: null,
+          targetGroupName: null,
+          createdByUsername: "공휴일"
+        }
+      ];
+    });
+  }, [holidays]);
+
+  const calendarEvents = useMemo(() => [...holidayEvents, ...events], [holidayEvents, events]);
+
+  const dayEvents = calendarEvents
+    .filter((e) => eventOverlapsLocalDay(e.startAt, e.endAt, selectedDay))
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  const panelEvents = dayEvents.filter((e) => !isHolidayEvent(e));
+  const selectedEvent = panelEvents.find((e) => e.id === selectedEventId) ?? panelEvents[0] ?? null;
+
   return (
-    <div className="layout-shell">
+    <div className={`layout-shell ${splitOpen ? "split-open" : ""}`}>
       <header className="top-bar">
         <div className="brand">FamilyCal</div>
         <div className="nav-actions nav-actions-right">
@@ -168,20 +256,92 @@ export default function HomePage() {
             <MonthCalendar
               year={year}
               monthIndex={monthIndex}
-              events={events}
+              events={calendarEvents}
+              holidays={holidays}
+              selectedDayKey={selectedDayKey}
+              compactMode={splitOpen}
               onPrevMonth={() => shiftMonth(-1)}
               onNextMonth={() => shiftMonth(1)}
               onToday={() => {
                 const today = new Date();
                 setYear(today.getFullYear());
                 setMonthIndex(today.getMonth());
+                setSelectedDay(today);
+                setSplitOpen(true);
               }}
-              onSelectEvent={(e) => setSelected(e)}
+              onSelectEvent={(e) => {
+                const d = new Date(e.startAt);
+                setSelectedDay(d);
+                setSelectedEventId(e.id);
+                setSplitOpen(true);
+              }}
               onSelectDay={(day) => {
-                setNewDay(day);
-                setNewOpen(true);
+                setSelectedDay(day);
+                setSelectedEventId(null);
+                setSplitOpen(true);
               }}
             />
+          </div>
+        ) : null}
+
+        {auth === "ok" && splitOpen ? (
+          <div
+            className={`card day-panel ${sheetDragging ? "dragging" : ""}`}
+            style={{ transform: `translateY(${sheetDragY}px)` }}
+          >
+            <div
+              className="day-panel-drag-zone"
+              onPointerDown={(e) => {
+                dragStartYRef.current = e.clientY;
+                setSheetDragging(true);
+              }}
+              aria-label="아래로 드래그하여 닫기"
+            >
+              <span className="day-panel-drag-handle" />
+            </div>
+            <div className="day-panel-head">
+              <div style={{ fontWeight: 800 }}>{formatSelectedDay(selectedDay)}</div>
+            </div>
+            {panelEvents.length === 0 ? (
+              <div className="pill">이 날짜에는 일정이 없습니다.</div>
+            ) : (
+              <div className="stack">
+                {panelEvents.map((event) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    className={`day-event-item ${selectedEvent?.id === event.id ? "active" : ""}`}
+                    onClick={() => setSelectedEventId(event.id)}
+                  >
+                    <span className="day-event-color-bar" style={{ backgroundColor: event.colorHex || "#C45C6A" }} aria-hidden />
+                    <span className="day-event-content">
+                      <span style={{ fontWeight: 700 }}>{event.title}</span>
+                      <span className="pill">{formatDateTimeWithoutSeconds(event.startAt)} ~ {formatDateTimeWithoutSeconds(event.endAt)}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedEvent ? (
+              <div className="day-event-detail">
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>{selectedEvent.title}</div>
+                <div className="pill" style={{ marginBottom: 10 }}>
+                  {formatDateTimeWithoutSeconds(selectedEvent.startAt)} ~ {formatDateTimeWithoutSeconds(selectedEvent.endAt)}
+                </div>
+                <div className="row" style={{ marginBottom: 10 }}>
+                  <span className="badge">{selectedEvent.visibility === "ALL_USERS" ? "가족 전체" : "그룹 한정"}</span>
+                  {selectedEvent.targetGroupName ? <span className="badge">{selectedEvent.targetGroupName}</span> : null}
+                </div>
+                {selectedEvent.description ? (
+                  <div style={{ whiteSpace: "pre-wrap" }}>{selectedEvent.description}</div>
+                ) : (
+                  <div className="pill">설명 없음</div>
+                )}
+                <div className="pill" style={{ marginTop: 10 }}>
+                  등록: {selectedEvent.createdByUsername}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </main>
@@ -192,41 +352,18 @@ export default function HomePage() {
         defaultDay={newDay}
         onCreated={() => void load()}
       />
-
-      {selected ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(17, 24, 39, 0.35)",
-            display: "grid",
-            placeItems: "center",
-            padding: 16,
-            zIndex: 40
+      {auth === "ok" ? (
+        <button
+          type="button"
+          className="fab-add"
+          aria-label="일정 추가"
+          onClick={() => {
+            setNewDay(selectedDay);
+            setNewOpen(true);
           }}
         >
-          <div className="card" style={{ width: "min(520px, 100%)" }}>
-            <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-              <div style={{ fontWeight: 800 }}>{selected.title}</div>
-              <button className="btn btn-ghost" type="button" onClick={() => setSelected(null)}>
-                닫기
-              </button>
-            </div>
-            <div className="pill" style={{ marginBottom: 10 }}>
-              {formatDateTimeWithoutSeconds(selected.startAt)} ~ {formatDateTimeWithoutSeconds(selected.endAt)}
-            </div>
-            <div className="row" style={{ marginBottom: 10 }}>
-              <span className="badge">{selected.visibility === "ALL_USERS" ? "가족 전체" : "그룹 한정"}</span>
-              {selected.targetGroupName ? <span className="badge">{selected.targetGroupName}</span> : null}
-            </div>
-            {selected.description ? <div style={{ whiteSpace: "pre-wrap" }}>{selected.description}</div> : <div className="pill">설명 없음</div>}
-            <div className="pill" style={{ marginTop: 10 }}>
-              등록: {selected.createdByUsername}
-            </div>
-          </div>
-        </div>
+          +
+        </button>
       ) : null}
     </div>
   );
@@ -247,4 +384,25 @@ function formatDateTimeWithoutSeconds(iso: string) {
     minute: "2-digit",
     hour12: false
   });
+}
+
+function eventOverlapsLocalDay(isoStart: string, isoEnd: string, day: Date) {
+  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0).getTime();
+  const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999).getTime();
+  const s = new Date(isoStart).getTime();
+  const e = new Date(isoEnd).getTime();
+  return s <= dayEnd && e >= dayStart;
+}
+
+function formatSelectedDay(day: Date) {
+  return day.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short"
+  });
+}
+
+function isHolidayEvent(event: EventResponse) {
+  return event.createdByUsername === "공휴일";
 }

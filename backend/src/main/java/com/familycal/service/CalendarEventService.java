@@ -83,6 +83,7 @@ public class CalendarEventService {
         CalendarEvent event = new CalendarEvent();
         event.setTitle(request.getTitle());
         event.setDescription(request.getDescription());
+        event.setColorHex(request.getColorHex());
         event.setStartAt(request.getStartAt());
         event.setEndAt(request.getEndAt());
         event.setVisibility(request.getVisibility());
@@ -111,6 +112,7 @@ public class CalendarEventService {
                 event.getId(),
                 event.getTitle(),
                 event.getDescription(),
+                event.getColorHex(),
                 event.getStartAt(),
                 event.getEndAt(),
                 event.getVisibility(),

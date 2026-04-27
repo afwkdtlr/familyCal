@@ -29,6 +29,9 @@ public class CalendarEvent {
     @Column(name = "DESCRIPTION", length = 2000)
     private String description;
 
+    @Column(name = "COLOR_HEX", length = 7)
+    private String colorHex;
+
     @Column(name = "START_AT", nullable = false)
     private Instant startAt;
 
@@ -72,6 +75,14 @@ public class CalendarEvent {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getColorHex() {
+        return colorHex;
+    }
+
+    public void setColorHex(String colorHex) {
+        this.colorHex = colorHex;
     }
 
     public Instant getStartAt() {
